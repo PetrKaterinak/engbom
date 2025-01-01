@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+    .component-box {
+        @apply border border-amber-500 rounded-md px-5 py-3;
+    }
+}
