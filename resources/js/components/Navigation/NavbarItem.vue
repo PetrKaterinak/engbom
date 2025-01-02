@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {Item} from 'Models/Item';
+import {Item} from './Models/Item';
 
 const props = defineProps<{
   item: Item,

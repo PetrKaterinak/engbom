@@ -1,36 +1,38 @@
-<script setup>
+<script setup lang="ts">
 
 import {computed, onMounted, onUnmounted, ref} from "vue";
 import router from "../../router.js";
 import {useRoute} from "vue-router";
 import NavbarItem from "./NavbarItem.vue";
 import NavbarSubmenu from "./NavbarSubmenu.vue";
+import {Item} from "./Models/Item";
+import {NavbarConfig} from "./Models/NavbarConfig";
 
-const props = defineProps({
-  logo: {type: String, required: false},
-  variableItems: {type: Array, required: true},
-  fixedItems: {type: Array, required: false},
-  navbarConfig: {type: Object, required: false},
-});
+
+const props = defineProps<{
+  logo?: any;
+  menuItems: { floating: Item[], fixed?: Item[] },
+  navbarConfig: NavbarConfig,
+}>();
 
 const route = useRoute();
 
 // Navbar state
-const navbarExpanded = ref(localStorage.getItem('navbar_is_expanded') === 'true' || false);
-const submenuExpanded = ref({});
-const tooltip = ref({visible: false, text: '', styles: {}});
-const popup = ref({visible: false, items: [], styles: {}});
-const mainPopup = ref({visible: false, styles: {}});
+const navbarExpanded = ref<boolean>(localStorage.getItem('navbar_is_expanded') === 'true' || false);
+const submenuExpanded = ref<Record<string, boolean>>({});
+const tooltip = ref<{ visible: boolean, text: string, styles: any, arrowPosition: 'left' | 'right' | 'center' }>({visible: false, text: '', styles: {}, arrowPosition: 'center'});
+const popup = ref<{ visible: boolean, items: Item[], styles: any }>({visible: false, items: [], styles: {}});
+const mainPopup = ref<{ visible: boolean; styles: any }>({visible: false, styles: {}});
 
 // Parse navbar config
-const activeColor = props.navbarConfig?.activeColor ?? '#756094';
-const primaryColor = props.navbarConfig?.primaryColor ?? '#452750';
-const secondaryColor = props.navbarConfig?.secondaryColor ?? '#2F1937';
+const activeColor = props.navbarConfig?.colors?.activeItemBackground ?? '#756094';
+const primaryColor = props.navbarConfig?.colors?.navbarBackgroundFrom ?? '#452750';
+const secondaryColor = props.navbarConfig?.colors?.navbarBackgroundTo ?? '#2F1937';
 const iconSize = props.navbarConfig?.iconSize ?? 'xl'; // Tailwind JIT safelist: 'text-xs', 'text-sm', 'text-base', 'text-lg', 'text-xl', 'text-2xl', 'text-3xl', 'text-4xl', 'text-5xl', 'text-6xl', 'text-7xl', 'text-8xl', 'text-9xl'
 const mobileBreakpoint = props.navbarConfig?.mobileBreakpoint ?? 640;
 
 // Helper function to check if an item (or its children) is active
-const isActive = (item) => {
+const isActive = (item: Item): boolean => {
   if (item.to && item.to === route.path) {
     return true;
   } else if (item.children) {
@@ -40,7 +42,7 @@ const isActive = (item) => {
 }
 
 // Compute active state for each item
-const computeActiveState = (items) => {
+const computeActiveState = (items: Item[]): Item[] => {
   const result = items.map((item) => ({
     ...item,
     isActive: isActive(item),
@@ -57,25 +59,25 @@ const computeActiveState = (items) => {
   return result;
 }
 
-const variableItems = computed(() => computeActiveState(props.variableItems));
-const fixedItems = computed(() => computeActiveState(props.fixedItems));
+const floatingMenuItems = computed(() => computeActiveState(props.menuItems.floating));
+const fixedMenuItems = computed(() => computeActiveState(props.menuItems.fixed ?? []));
 
 // Toggle navbar size
-function toggleNavbarExpansion(newState = null) {
+function toggleNavbarExpansion(newState: boolean | null = null) {
   navbarExpanded.value = newState ?? !navbarExpanded.value;
   if (navbarExpanded.value === false) {
     submenuExpanded.value = {};
   } else {
     hideTooltip();
     // expand submenu for active items
-    variableItems.value.forEach((item, index) => {
+    floatingMenuItems.value.forEach((item, index) => {
       if (item.children && item.isActive) {
-        submenuExpanded.value['variableItems_' + index] = true;
+        submenuExpanded.value['floatingMenuItems_' + index] = true;
       }
     });
-    fixedItems.value.forEach((item, index) => {
+    fixedMenuItems.value.forEach((item, index) => {
       if (item.children && item.isActive) {
-        submenuExpanded.value['fixedItems_' + index] = true;
+        submenuExpanded.value['fixedMenuItems_' + index] = true;
       }
     });
   }
@@ -83,12 +85,12 @@ function toggleNavbarExpansion(newState = null) {
 }
 
 // Toggle submenu visibility for expanded navbar
-const toggleSubmenuExpand = (groupAndIndex) => {
+const toggleSubmenuExpand = (groupAndIndex: string) => {
   submenuExpanded.value[groupAndIndex] = !submenuExpanded.value[groupAndIndex]
 }
 
 // Handle item click
-const handleClick = (item, groupAndIndex, event) => {
+const handleClick = (item: Item, groupAndIndex: string, event: MouseEvent) => {
   const [prop, index] = groupAndIndex.split('_');
   if (item.children && !item.to && navbarExpanded.value) {
     // Expand submenu when navbar is expanded
@@ -104,17 +106,29 @@ const handleClick = (item, groupAndIndex, event) => {
 }
 
 // Handle submenu item click
-const handleSubmenuClick = (child) => {
+const handleSubmenuClick = (child: Item) => {
   if (child.to) router.push(child.to);
   popup.value.visible = false; // Close popup after click
 };
 
-const showTooltip = (groupAndIndex, event) => {
+const showTooltip = (groupAndIndex: string, event: MouseEvent) => {
   const [prop, index] = groupAndIndex.split('_');
   const item = prop && index ? props[prop][index] : {};
   const rect = event.target.getBoundingClientRect();
 
   const isMobile = window.innerWidth < mobileBreakpoint;
+  const tooltipWidth = item.title.length * 6;
+  const viewportWidth = window.innerWidth;
+  let arrowPosition = 'center';
+
+  let left = isMobile
+      ? rect.left + rect.width / 2
+      : rect.right + 10;
+
+  if (left + tooltipWidth > viewportWidth) {
+    left = viewportWidth - tooltipWidth;
+    arrowPosition = 'right';
+  }
 
   tooltip.value = {
     visible: true,
@@ -122,8 +136,9 @@ const showTooltip = (groupAndIndex, event) => {
     styles: {
       top: isMobile ? `${rect.bottom}px` : `${rect.top + rect.height / 2}px`,
       transform: isMobile ? 'translateX(-50%)' : 'translateY(-50%)',
-      left: isMobile ? `${rect.left + rect.width / 2}px` : `${rect.right + 10}px`,
-    }
+      left: `${left}px`,
+    },
+    arrowPosition,
   };
 };
 
@@ -133,7 +148,7 @@ const hideTooltip = () => {
 };
 
 // Show popup submenu
-const showPopupMenu = (title, items, event) => {
+const showPopupMenu = (title: string, items: Item[], event: MouseEvent) => {
   const isMobile = window.innerWidth < mobileBreakpoint;
   let rect;
   if (isMobile) {
@@ -155,7 +170,7 @@ const showPopupMenu = (title, items, event) => {
 };
 
 // Show main popup
-const showMainPopup = (event) => {
+const showMainPopup = (event: MouseEvent) => {
   const rect = document.getElementById('logo-section').getBoundingClientRect();
   mainPopup.value = {
     visible: true,
@@ -167,7 +182,7 @@ const showMainPopup = (event) => {
 };
 
 // Close popup when clicked outside
-const handleClickOutside = (event) => {
+const handleClickOutside = (event: MouseEvent) => {
   // Check if clicked inside the popup
   if (!event.target.closest('.navbar-popup') && popup.value.visible) {
     popup.value.visible = false;
@@ -179,7 +194,7 @@ const handleClickOutside = (event) => {
 };
 
 // Handle window resize
-let timeout;
+let timeout: NodeJS.Timeout;
 const handleResize = () => {
   clearTimeout(timeout);
   timeout = setTimeout(() => {
@@ -210,6 +225,12 @@ onUnmounted(() => {
     <!-- Logo section -->
     <div @click.stop="showMainPopup" id="logo-section" class="min-w-14 sm:w-full pr-2 flex items-center" :class="[navbarExpanded ? 'justify-start' : 'justify-center']">
       <img v-if="props.logo" :src="props.logo" alt="logo" class="w-full max-w-8 aspect-square"/>
+      <svg v-else viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg" class="w-full max-w-8 aspect-square">
+        <rect y="20" width="250" height="250" style="stroke: rgb(0, 0, 0); fill: rgb(117, 96, 148);" x="20"></rect>
+        <rect x="20" y="300" width="180" height="180" style="stroke: rgb(0, 0, 0); fill: rgb(143, 117, 180);"></rect>
+        <rect x="330" y="330" width="150" height="150" style="stroke: rgb(0, 0, 0); fill: rgb(179, 147, 227);"></rect>
+        <rect x="300" y="20" width="180" height="180" style="stroke: rgb(0, 0, 0); fill: rgb(143, 117, 180);"></rect>
+      </svg>
       <div v-if="navbarExpanded" class="flex flex-col h-full ml-2 overflow-hidden leading-3">
         <span class="font-bold text-lg truncate text-white">Engineering Bill of Material</span>
         <span>Petr Katerinak</span>
@@ -219,9 +240,9 @@ onUnmounted(() => {
 
     <!-- Navigation Items -->
     <nav class="flex flex-row sm:flex-col gap-2 h-full w-full overflow-y-hidden sm:overflow-y-auto overflow-x-auto sm:overflow-x-hidden scrollbar-gutter-stable scrollbar-thin">
-      <div v-for="(item, index) in variableItems" :key="'variableItems_' + index" class="relative w-full">
-        <div @click="handleClick(item, 'variableItems_' + index, $event)"
-             @mouseenter="navbarExpanded ? () => {} : showTooltip('variableItems_' + index, $event)"
+      <div v-for="(item, index) in floatingMenuItems" :key="'floatingMenuItems_' + index" class="relative w-full">
+        <div @click="handleClick(item, 'floatingMenuItems_' + index, $event)"
+             @mouseenter="navbarExpanded ? () => {} : showTooltip('floatingMenuItems_' + index, $event)"
              @mouseleave="hideTooltip"
              class="navbar-button"
              :class="item.isActive ? 'text-white' : 'hover:bg-white/30 text-gray-400'"
@@ -233,7 +254,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Submenu -->
-        <NavbarSubmenu v-if="item.children && submenuExpanded['variableItems_' + index]"
+        <NavbarSubmenu v-if="item.children && submenuExpanded['floatingMenuItems_' + index]"
                        :children="item.children" :active-color="activeColor" :icon-size="iconSize"
                        @submenu-clicked="handleSubmenuClick"/>
 
@@ -242,9 +263,9 @@ onUnmounted(() => {
 
     <!-- Bottom Navigation Items -->
     <nav class="flex flex-row sm:flex-col gap-2 sm:w-full pr-2">
-      <div v-for="(item, index) in fixedItems" :key="'fixedItems_' + index" class="relative w-full">
-        <div @click="handleClick(item, 'fixedItems_' + index, $event)"
-             @mouseenter="navbarExpanded ? () => {} : showTooltip('fixedItems_' + index, $event)"
+      <div v-for="(item, index) in fixedMenuItems" :key="'fixedMenuItems_' + index" class="relative w-full">
+        <div @click="handleClick(item, 'fixedMenuItems_' + index, $event)"
+             @mouseenter="navbarExpanded ? () => {} : showTooltip('fixedMenuItems_' + index, $event)"
              @mouseleave="hideTooltip"
              class="navbar-button"
              :class="item.isActive ? 'text-white' : 'hover:bg-white/30 text-gray-400'"
@@ -256,7 +277,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Submenu -->
-        <NavbarSubmenu v-if="item.children && submenuExpanded['fixedItems_' + index]"
+        <NavbarSubmenu v-if="item.children && submenuExpanded['fixedMenuItems_' + index]"
                        :children="item.children" :active-color="activeColor" :icon-size="iconSize"
                        @submenu-clicked="handleSubmenuClick"/>
 
@@ -286,7 +307,12 @@ onUnmounted(() => {
   <Teleport to="body">
     <div v-if="tooltip.visible && !navbarExpanded" class="navbar-tooltip" :style="tooltip.styles">
       {{ tooltip.text }}
-      <div class="navbar-tooltip-arrow"/>
+      <div class="navbar-tooltip-arrow"
+           :class="{
+        'left-1/2 sm:left-0 -translate-x-1/2 sm:translate-x-0': tooltip.arrowPosition === 'center',
+        'left-1/4 sm:left-0 -translate-x-1/2 sm:translate-x-0': tooltip.arrowPosition === 'left',
+        'left-3/4 sm:left-0 -translate-x-1/2 sm:translate-x-0': tooltip.arrowPosition === 'right'
+      }"/>
     </div>
   </Teleport>
 
@@ -346,7 +372,7 @@ onUnmounted(() => {
 }
 
 .navbar-tooltip-arrow {
-  @apply absolute left-1/2 sm:left-0 top-0 sm:top-1/2 -translate-x-1/2 sm:translate-x-0 translate-y-0 sm:-translate-y-1/2 -mt-1 sm:mt-0 ml-0 sm:-ml-1 w-2 h-2 bg-white rotate-45;
+  @apply absolute top-0 sm:top-1/2 translate-y-0 sm:-translate-y-1/2 -mt-1 sm:mt-0 ml-0 sm:-ml-1 w-2 h-2 bg-white rotate-45;
 }
 
 .navbar-popup {
