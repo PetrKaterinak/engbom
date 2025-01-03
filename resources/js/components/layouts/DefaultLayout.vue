@@ -30,7 +30,7 @@ const menuItems = {
     {
       icon: 'mdi mdi-file-document-outline',
       title: 'Reports',
-      badge: 15,
+      badge: 'auto',
       children: [
         {to: '/reports/summary', title: 'Summary Reports', badge: 7},
         {to: '/reports/detail', title: 'Detailed Reports', badge: 8},
@@ -88,18 +88,50 @@ const menuItems = {
       icon: 'mdi mdi-cog',
       to: '/settings',
       title: 'Settings',
+    }
+  ],
+  iconMenu: [
+    {
+      icon: 'mdi mdi-office-building-cog-outline',
+      to: '/organization',
+      title: 'Organization',
+    },
+    { // Usage & Billing
+      icon: 'mdi mdi-currency-usd',
+      to: '/billing',
+      title: 'Billing',
+    }
+  ],
+  iconUser: [
+    {
+      icon: 'mdi mdi-account-circle',
+      to: '/profile',
+      title: 'Profile',
     },
     {
       icon: 'mdi mdi-logout',
       to: '/logout',
       title: 'Logout',
     }
-  ]
+  ],
 };
 
 const navbarConfig = {
+  site: {
+    name: 'Engineering Bill of Materials',
+    logo: indeevCubeLogo,
+  },
+  user: {
+    name: 'Petr Kateřiňák',
+    email: 'katerinak.petr@gmail.com',
+    avatar: 'https://i.pravatar.cc/250?u=katerinak.petr@gmail.com',
+  },
   colors: {
-    activeItemBackground: '#07C7F8',
+    itemActiveBG: '#07C7F8',
+    itemActiveText: '#fff',
+    itemText: '#999',
+    itemHoverBG: 'rgba(255,255,255,0.3)',
+    itemHoverText: '#c1c6cd',
     navbarBackgroundFrom: '#222',
     navbarBackgroundTo: '#444',
   },
@@ -109,7 +141,7 @@ const navbarConfig = {
 
 <template>
   <div class="relative min-h-screen bg-white flex flex-col sm:flex-row">
-    <Navbar :logo="indeevCubeLogo" :menu-items="menuItems" :navbar-config="navbarConfig"/>
+    <Navbar :menu-items="menuItems" :navbar-config="navbarConfig"/>
     <div class="w-full px-5 py-5 overflow-y-auto">
       <router-view/>
     </div>
