@@ -220,25 +220,41 @@ const handleResize = () => {
   }, 200); // Delay in milliseconds
 };
 
+function checkScrollbar() {
+  const nav = document.getElementById("floating-nav");
+  const shadow = document.getElementsByClassName("nav-shadow");
+  if (nav.scrollHeight > nav.clientHeight || (window.innerWidth < mobileBreakpoint && nav.scrollWidth > nav.clientWidth)) {
+    Array.from(shadow).forEach(element => element.classList.add("opacity-100"));
+  } else {
+    Array.from(shadow).forEach(element => element.classList.remove("opacity-100"));
+  }
+}
+
 // Attach and detach event listeners
 onMounted(() => {
   window.addEventListener('resize', handleResize)
   document.addEventListener('click', handleClickOutside);
+  checkScrollbar();
+  window.addEventListener("resize", checkScrollbar);
 });
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
   document.removeEventListener('click', handleClickOutside);
 });
+
+
+// Run on load and when window resizes
+
 </script>
 
 <template>
-  <div id="navbar" class="w-full sm:h-screen flex flex-row sm:flex-col gap-1 sm:gap-4 items-center py-2 sm:py-4 pl-2"
+  <div id="navbar" class="w-full sm:h-screen flex flex-row sm:flex-col gap-1 sm:gap-4 items-center py-2 sm:py-4"
        :class="[ navbarExpanded ? 'sm:w-56' : 'sm:w-14' ]"
        :style="[ `background: ${primaryColor}`, `background: linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`]">
 
     <!-- Logo section -->
-    <div @click.stop="showMainPopup" id="logo-section" class="min-w-14 sm:w-full pr-2 flex items-center" :class="[navbarExpanded ? 'justify-start' : 'justify-center']">
+    <div @click.stop="showMainPopup" id="logo-section" class="min-w-14 sm:w-full flex items-center" :class="[navbarExpanded ? 'justify-start' : 'justify-center']">
       <img v-if="site?.logo" :src="site.logo" alt="logo" class="w-full max-w-8 aspect-square"/>
       <svg v-else viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg" class="w-full max-w-8 aspect-square">
         <rect y="20" width="250" height="250" style="stroke: rgb(0, 0, 0); fill: rgb(117, 96, 148);" x="20"></rect>
@@ -253,7 +269,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Navigation Items -->
-    <nav class="flex flex-row sm:flex-col gap-2 h-full w-full overflow-y-hidden sm:overflow-y-auto overflow-x-auto sm:overflow-x-hidden scrollbar-gutter-stable scrollbar-thin">
+    <nav id="floating-nav" class="flex flex-row sm:flex-col gap-2 h-full w-full overflow-y-hidden sm:overflow-y-auto overflow-x-auto sm:overflow-x-hidden scrollbar-hidden px-2">
       <div v-for="(item, index) in floatingMenuItems" :key="'floating_' + index" class="relative w-full">
         <div @click="handleClick(item, 'floating_' + index, $event)"
              @mouseenter="navbarExpanded ? () => {} : showTooltip('floating_' + index, $event)"
@@ -275,29 +291,32 @@ onUnmounted(() => {
     </nav>
 
     <!-- Bottom Navigation Items -->
-    <nav class="flex flex-row sm:flex-col gap-2 sm:w-full pr-2">
-      <div v-for="(item, index) in fixedMenuItems" :key="'fixed_' + index" class="relative w-full">
-        <div @click="handleClick(item, 'fixed_' + index, $event)"
-             @mouseenter="navbarExpanded ? () => {} : showTooltip('fixed_' + index, $event)"
-             @mouseleave="hideTooltip"
-             class="navbar-button"
-             :style="item.isActive ? `background-color: ${itemActiveBGColor}; color: ${itemActiveTextColor};` : `--hover-bg: ${itemHoverBGColor}; color: ${itemTextColor}; --hover-text: ${itemHoverTextColor};`">
+    <div class="relative sm:w-full">
+      <div class="nav-shadow absolute -top-2 sm:-top-8 -left-4 sm:left-0 w-4 sm:w-full h-[calc(100%+1rem)] sm:h-4 bg-gradient-to-l sm:bg-gradient-to-t from-black/30 to-transparent opacity-0 pointer-events-none transition-opacity duration-300"></div>
+      <nav id="fixed-nav" class="flex flex-row sm:flex-col gap-2 sm:w-full justify-center px-2">
+        <div v-for="(item, index) in fixedMenuItems" :key="'fixed_' + index" class="relative w-full">
+          <div @click="handleClick(item, 'fixed_' + index, $event)"
+               @mouseenter="navbarExpanded ? () => {} : showTooltip('fixed_' + index, $event)"
+               @mouseleave="hideTooltip"
+               class="navbar-button"
+               :style="item.isActive ? `background-color: ${itemActiveBGColor}; color: ${itemActiveTextColor};` : `--hover-bg: ${itemHoverBGColor}; color: ${itemTextColor}; --hover-text: ${itemHoverTextColor};`">
 
-          <!-- Icon and Title -->
-          <NavbarItem :navbar-expanded="navbarExpanded" :item="item" :icon-size="iconSize"/>
+            <!-- Icon and Title -->
+            <NavbarItem :navbar-expanded="navbarExpanded" :item="item" :icon-size="iconSize"/>
+
+          </div>
+
+          <!-- Submenu -->
+          <NavbarSubmenu v-if="item.children && submenuExpanded['fixed_' + index]"
+                         :children="item.children" :active-color="itemActiveBGColor" :icon-size="iconSize"
+                         @submenu-clicked="handleSubmenuClick"/>
 
         </div>
-
-        <!-- Submenu -->
-        <NavbarSubmenu v-if="item.children && submenuExpanded['fixed_' + index]"
-                       :children="item.children" :active-color="itemActiveBGColor" :icon-size="iconSize"
-                       @submenu-clicked="handleSubmenuClick"/>
-
-      </div>
-    </nav>
+      </nav>
+    </div>
 
     <!-- Expand/Collapse Button -->
-    <nav class="hidden sm:flex flex-row sm:flex-col space-y-2 w-full xs:pb-2 sm:pr-2">
+    <nav id="collapse-nav" class="hidden sm:flex flex-row sm:flex-col space-y-2 w-full xs:pb-2 px-2">
       <div class="relative w-full">
         <div @click="toggleNavbarExpansion(null)"
              @mouseenter="navbarExpanded ? () => {} : showTooltip('expandToggle', $event)"
@@ -429,6 +448,10 @@ onUnmounted(() => {
 /* Custom scrollbar styles */
 .scrollbar-thin {
   scrollbar-width: thin;
+}
+
+.scrollbar-hidden {
+  scrollbar-width: none;
 }
 
 .scrollbar-gutter-stable {

@@ -118,7 +118,8 @@ const menuItems = {
 
 const navbarConfig = {
   site: {
-    name: 'Engineering Bill of Materials',
+    title: 'Engineering Bill of Materials',
+    subtitle: 'SK 38x',
     logo: indeevCubeLogo,
   },
   user: {
